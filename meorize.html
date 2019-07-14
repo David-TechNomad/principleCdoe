@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>记忆函数</title>
+</head>
+<body>
+    <script>
+        function memorize(fn, callback) {
+            var cache = {};
+            return function() {
+                var key = callback.apply(this, arguments);
+                // 使用缓存
+                if(key in cache) {
+                    return cache[key];
+                }
+                // 不使用缓存
+                return cache[key] = fn.apply(this, arguments)
+            }
+        }
+        // 设计模式：代理模式
+        // 设计原则：单一职责原则
+        var propValue = function(obj) {
+            return obj.value;
+        }
+        var memorizeValue = memorize(propValue, function() {
+            var args = JSON.stringify(Array.prototype.slice.call(arguments));
+            return args;
+        })
+        // var memorizeAdd = memorize(add, function() {
+        //     var args = JSON.stringify(Array.prototype.slice.call(arguments));
+        //     return args;
+        // })
+        // function add(n, m) {
+        //     return n + m;
+        // }
+        // console.time("not use memorize");
+        // for(var i = 0; i<10000;i++) {
+        //      add(1, 1);
+        // }
+        // console.timeEnd("not use memorize");
+
+
+        // console.time("use memorize");
+        // for(var i = 0; i<10000;i++) {
+        //     memorizeAdd(1, 1);
+        // }
+        // console.timeEnd("use memorize");
+        // 斐波那契 数列
+        var count = 0;
+        var fibonaccai = function(n) {
+            count ++;
+            return n < 2 ? n : fibonaccaiMemorize(n-1) + fibonaccaiMemorize(n-2);
+        }
+
+        // console.log(fibonaccai(20));
+        // console.log("执行次数" + count);
+
+        var fibonaccaiMemorize = memorize(fibonaccai, function() {
+            var args = JSON.stringify(Array.prototype.slice.call(arguments));
+            return args;
+        })
+        console.log(fibonaccaiMemorize(1000));
+        console.log("执行次数" + count);
+    </script>
+</body>
+</html>   
