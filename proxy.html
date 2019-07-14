@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <div id="app">
+        <h3 id="para"></h3>
+        <input type="text" id="input">
+
+    </div>
+    <script>
+        var para = document.getElementById('para');
+        var input = document.getElementById('input');
+        // 需要代理的数据对象
+        const data = {
+            text:'hello word'
+        }
+        const handler = {
+            //监控data中text的改变
+            set :function(target, prop, value) {
+                if(prop === 'text') {
+                    //更新值
+                    target[prop] = value;
+                    //更新视图
+                    para.innerHTML = value;
+                    input.value = value;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        // 构造proxy对象
+        var myText = new Proxy(data, handler);
+        //添加input监听事件
+        input.addEventListener('input',function(e) {
+            myText.text = e.target.value; //更新myText的值
+        })
+        //初始化myText的值
+        myText.text = data.text;
+    </script>
+</body>
+</html>
