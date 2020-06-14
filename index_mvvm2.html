@@ -7,61 +7,211 @@
 </head>
 
 <body>
+    <button id="add">add</button>
 	<div id="app"></div>
-
 	<script>
-        let x;
-        let y;
-        let f = n => n * 100 + 100;
+        /* eslint-disable no-unused-vars */
+        // let x;
+        // let y;
+        // let f = n => n * 100 + 100;
 
         let active;
 
-        let onXChanged = function(cb) {
-        active = cb;
-        active();
-        active = null;
+        let effect = (fn, options = {}) => {
+            let effect = (...args) => {
+                try {
+                active = effect;
+                return fn(...args);
+                } finally {
+                active = null;
+                }
+            };
+
+            effect.options = options;
+            effect.deps = [];
+
+            return effect;
+        };
+
+        let cleanUpEffect = effect => {
+            const { deps } = effect;
+
+            if (deps.length) {
+                for (let i = 0; i < deps.length; i++) {
+                deps[i].delete(effect);
+                }
+            }
+        };
+
+        let watchEffect = function(cb) {
+            let runner = effect(cb);
+            runner();
+
+            return () => {
+                cleanUpEffect(runner);
+            };
+        };
+
+        let queue = [];
+        let nextTick = cb => Promise.resolve().then(cb);
+        let queueJob = job => {
+            if (!queue.includes(job)) {
+                queue.push(job);
+                nextTick(flushJobs);
+            }
+        };
+        let flushJobs = () => {
+            let job;
+            while ((job = queue.shift()) !== undefined) {
+                job();
+            }
         };
 
         class Dep {
-        constructor() {
-            this.deps = new Set();
-        }
-        depend() {
-            if (active) {
-            this.deps.add(active);
+            constructor() {
+                this.deps = new Set();
+            }
+            depend() {
+                if (active) {
+                    this.deps.add(active);
+                    active.deps.push(this.deps);
+                }
+            }
+            notify() {
+                this.deps.forEach(dep => queueJob(dep));
+                this.deps.forEach(dep => {
+                    dep.options && dep.options.schedular && dep.options.schedular();
+                });
             }
         }
-        notify() {
-            this.deps.forEach(dep => dep());
-        }
-        }
 
-        let ref = initValue => {
-        let value = initValue;
-        let dep = new Dep();
+        let createReactive = (target, prop, value) => {
+            let dep = new Dep();
 
-        return Object.defineProperty({}, "value", {
-            get() {
-            dep.depend();
-            return value;
-            },
-            set(newValue) {
-            value = newValue;
-            dep.notify();
-            }
-        });
+            return new Proxy(target, {
+                get(target, prop) {
+                dep.depend();
+                return Reflect.get(target, prop);
+                },
+                set(target, prop, value) {
+                dep.notify();
+                return Reflect.set(target, prop, value);
+                }
+            });
+
+            // return Object.defineProperty(target, prop, {
+            //   get() {
+            //     dep.depend();
+            //     return value;
+            //   },
+            //   set(newValue) {
+            //     value = newValue;
+            //     dep.notify();
+            //   },
+            // });
         };
 
-        x = ref(1); // 200
+        let ref = value => createReactive({}, "value", value);
+        let set = (obj, prop, value) => createReactive(obj, prop, value);
 
-        onXChanged(() => {
-        //   document.write(`hello ${x.value}`);
-            y = f(x.value);
-            console.log(y);
+        let computed = fn => {
+            let value;
+            let dirty = true;
+
+            let runner = effect(fn, {
+                schedular: () => {
+                if (!dirty) {
+                    dirty = true;
+                }
+                }
+            });
+
+            return {
+                get value() {
+                if (dirty) {
+                    value = runner();
+                    dirty = false;
+                }
+
+                return value;
+                }
+            };
+        };
+
+        let watch = (source, cb, options = {}) => {
+            const { immediate } = options;
+            const getter = () => {
+                return source();
+            };
+            let oldValue;
+            const runner = effect(getter, {
+                schedular: () => applyCb()
+            });
+
+            const applyCb = () => {
+                let newValue = runner();
+                if (newValue !== oldValue) {
+                cb(newValue, oldValue);
+                oldValue = newValue;
+                }
+            };
+
+            if (immediate) {
+                applyCb();
+            } else {
+                oldValue = runner();
+            }
+        };
+
+        let count = set([], 1, 0);
+        // let computedValue = computed(() => count.value + 3);
+
+        // Vue.set
+        let push = Array.prototype.push;
+        Array.prototype.push = function(...args) {
+            push.apply(this, [...args]);
+            this._dep && this._dep.notify();
+        };
+        /**
+         *'push',
+        'pop',
+        'shift',
+        'unshift',
+        'splice',
+        'sort',
+        'reverse'
+        */
+
+        let value = 0;
+        document.getElementById("add").addEventListener("click", function() {
+            // count[2]++;
+
+            value++;
+        count.push(value);
+        });
+        let str;
+        let stop = watchEffect(() => {
+            str = `hello ${count.join(",")}`;
+            document.getElementById("app").innerText = str;
         });
 
-        x.value = 2; // 300
-        x.value = 3; // 400
+        // setTimeout(() => {
+        //   stop();
+        // }, 3000);
+        watch(
+            () => count.value,
+            (newValue, oldValue) => {
+                console.log(newValue, oldValue);
+            },
+            { immediate: true }
+        );
+
+        // 1. let x = computed(() => count.value + 3);
+        // 2. watch(() => count.value, (currentValue, preValue) => {
+        //
+        // }, { deep, immediate })
+        // 3. let stop = watchEffect(() => count.value + 3)
+
 	</script>
 </body>
 
